@@ -1,2 +1,9 @@
-t = a 1;
-a = 3;
+int r;
+double pi;
+double area, cir;
+int t[10][100],c[3];
+int tmp;
+r = 5;
+pi = 3.14;
+area = pi * r * r;
+cir = pi * r + pi * r;

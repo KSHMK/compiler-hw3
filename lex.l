@@ -6,13 +6,20 @@
 void lexerror(char *str);
 extern int CHAR_NUMBER;
 extern int LINE_NUMBER;
-int check = 0;
 
 %}
 
 %option noyywrap
 
 %%
+
+int {
+    return TYPE_INTEGER;
+}
+
+double {
+    return TYPE_DOUBLE;
+}
 
 [a-zA-Z][0-9a-zA-Z]* {
     yylval.sval = strdup(yytext);
@@ -32,7 +39,7 @@ int check = 0;
     return DOUBLE;
 }
 
-[-+()=/*;] { CHAR_NUMBER += yyleng; return *yytext; }
+[-+()=/*;\[\],] { CHAR_NUMBER += yyleng; return *yytext; }
 
 [\n] { CHAR_NUMBER = 0; LINE_NUMBER++; }
 
@@ -41,10 +48,3 @@ int check = 0;
 .   lexerror(yytext);
 
 %%
-
-int checker(int t)
-{
-    if(check && t)
-        return 1;
-    
-}

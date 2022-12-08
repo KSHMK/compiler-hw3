@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <stdlib.h>
 #include "data_set.h"
 
 int CHAR_NUMBER;
@@ -14,6 +15,7 @@ FILE* FILE_MIDDLE;
 DATA* unary_handle(char op, DATA* in);
 DATA* opcode_handle(char op, DATA* l, DATA* r);
 DATA* assign_handle(char* var, DATA* in);
+LIST* var_array_handle(char* array_int, LIST* list);
 void p_out(char* str, ...);
 
 void yyerror(char * str);
@@ -26,12 +28,15 @@ int yylex(void);
 %union {
     char* sval;
     DATA* dval;
+    LIST* list;
 }
 
 
 %token <sval> INTEGER 
 %token <sval> VARIABLE 
 %token <sval> DOUBLE
+%token <sval> TYPE_INTEGER
+%token <sval> TYPE_DOUBLE
 
 %left '+' '-'
 %left '*' '/'
@@ -39,14 +44,39 @@ int yylex(void);
 %nonassoc UNARY
 
 %type <dval> factor expr_unary expr_mul expr_add expr assign_state
+%type <list> var_array var_list var_define
 
 %%
 program:
-    assign_state ';'
-    | program assign_state ';'       { data_free($2); }
+    state ';'
+    | program state ';'       
     |
     | error ';'                
     ;
+
+state:
+    assign_state            { data_free($1); }
+    | type_state
+    ;
+
+type_state:
+    TYPE_INTEGER var_define     { var_set_type($2, INTEGER); }
+    | TYPE_DOUBLE var_define    { var_set_type($2, DOUBLE); }
+    ;
+
+var_define:
+    var_list                    
+    | var_define ',' var_list   { $$=list_append($1, $3); }
+    ;
+
+var_list:
+    VARIABLE var_array          { $$=list_new(var_set($1, $2)); }
+
+var_array:
+    '[' INTEGER ']' var_array   { $$=var_array_handle($2, $4); }
+    |                           { $$=NULL; }
+    ;
+
 assign_state:
     expr                        
     | VARIABLE '=' assign_state { $$=assign_handle($1, $3); } 
@@ -76,7 +106,7 @@ expr_unary:
 
 factor:
     INTEGER                     { $$=data_new(INTEGER, 0, $1); }
-    | VARIABLE                  { $$=data_new(INTEGER, 0, $1); }
+    | VARIABLE                  { $$=var_get($1); }
     | DOUBLE                    { $$=data_new(DOUBLE, 0, $1); }
     | '(' expr ')'              { $$=$2; }
     ;
@@ -113,15 +143,37 @@ DATA* assign_handle(char* var, DATA* in)
 
 DATA* opcode_handle(char op, DATA* l, DATA* r)
 {
+    DATA* tmp_num;
+    if(l->type != r->type)
+    {
+        tmp_num = get_temp_var(DOUBLE);
+        if(l->type == INTEGER)
+        {
+            p_out("%s = inttoreal %s", tmp_num->s, l->s);
+            data_free(l);
+            l = tmp_num;
+        }
+        else {
+            p_out("%s = inttoreal %s", tmp_num->s, r->s);
+            data_free(r);
+            r = tmp_num;
+        }
+    }
     int type = l->type;
-    if(r->type == DOUBLE)
-        type = DOUBLE;
     
     DATA* tmp = get_temp_var(type);
     p_out("%s = %s %c %s", tmp->s, l->s, op, r->s);
     data_free(l);
     data_free(r);
     return tmp;
+}
+
+LIST* var_array_handle(char* array_int_str, LIST* list)
+{
+    int array_int;
+    array_int = atoi(array_int_str);
+    free(array_int_str);
+    return list_append(list_new(array_int), list);
 }
 
 void p_out(char* str, ...)
@@ -147,6 +199,9 @@ int main(void) {
     CHAR_NUMBER = 0;
 
     yyparse();
+    var_save();
+    var_free();
     fclose(FILE_MIDDLE);
+
     return 0;
 }
