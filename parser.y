@@ -15,7 +15,9 @@ FILE* FILE_MIDDLE;
 DATA* unary_handle(char op, DATA* in);
 DATA* opcode_handle(char op, DATA* l, DATA* r);
 DATA* assign_handle(char* var, DATA* in);
-LIST* var_array_handle(char* array_int, LIST* list);
+LIST* var_def_array_handle(char* array_int, LIST* list);
+LIST* var_array_handle(DATA* array_data, LIST* list);
+void prnt_var_array(LIST* list);
 void p_out(char* str, ...);
 
 void yyerror(char * str);
@@ -43,8 +45,8 @@ int yylex(void);
 %right '='
 %nonassoc UNARY
 
-%type <dval> factor expr_unary expr_mul expr_add expr assign_state
-%type <list> var_array var_list var_define
+%type <dval> factor expr_unary expr_mul expr_add expr assign_state var_list
+%type <list> var_array var_def_list var_def_array var_define
 
 %%
 program:
@@ -65,15 +67,15 @@ type_state:
     ;
 
 var_define:
-    var_list                    
-    | var_define ',' var_list   { $$=list_append($1, $3); }
+    var_def_list                    
+    | var_define ',' var_def_list   { $$=list_append($1, $3); }
     ;
 
-var_list:
-    VARIABLE var_array          { $$=list_new(var_set($1, $2)); }
+var_def_list:
+    VARIABLE var_def_array      { LIST_DATA data; data.i = var_set($1, $2); $$=list_new(data, 0); }
 
-var_array:
-    '[' INTEGER ']' var_array   { $$=var_array_handle($2, $4); }
+var_def_array:
+    '[' INTEGER ']' var_def_array   { $$=var_def_array_handle($2, $4); }
     |                           { $$=NULL; }
     ;
 
@@ -106,11 +108,18 @@ expr_unary:
 
 factor:
     INTEGER                     { $$=data_new(INTEGER, 0, $1); }
-    | VARIABLE                  { $$=var_get($1); }
+    | var_list                  
     | DOUBLE                    { $$=data_new(DOUBLE, 0, $1); }
     | '(' expr ')'              { $$=$2; }
     ;
 
+var_list:
+    VARIABLE var_array          { $$=var_get($1, $2); }
+
+var_array:
+    '[' expr ']' var_array      { $$=var_array_handle($2, $4); }
+    |                           { $$=NULL; }
+    ;
 
 %%
 
@@ -168,12 +177,21 @@ DATA* opcode_handle(char op, DATA* l, DATA* r)
     return tmp;
 }
 
-LIST* var_array_handle(char* array_int_str, LIST* list)
+LIST* var_def_array_handle(char* array_int_str, LIST* list)
 {
-    int array_int;
-    array_int = atoi(array_int_str);
+    
+    LIST_DATA data; 
+    data.i = atoi(array_int_str);
     free(array_int_str);
-    return list_append(list_new(array_int), list);
+    return list_append(list_new(data, 0), list);
+}
+
+LIST* var_array_handle(DATA* array_data, LIST* list)
+{
+    LIST_DATA data;
+    data.s = strdup(array_data->s);
+    data_free(array_data);
+    return list_append(list_new(data, 1), list);
 }
 
 void p_out(char* str, ...)
@@ -186,11 +204,11 @@ void p_out(char* str, ...)
 }
 
 void lexerror(char *str) {
-    fprintf(FILE_MIDDLE, "lexical error(%d:%d): %s\n", LINE_NUMBER, CHAR_NUMBER, str);
+    printf("lexical error(%d:%d): %s\n", LINE_NUMBER, CHAR_NUMBER, str);
 }
 
 void yyerror(char *str) {
-    fprintf(FILE_MIDDLE, "%s(%d)\n", str, LINE_NUMBER);
+    printf("%s(%d)\n", str, LINE_NUMBER);
 }
 
 int main(void) {

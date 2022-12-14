@@ -1,3 +1,4 @@
+
 int r;
 double pi;
 double area, cir;
@@ -7,3 +8,5 @@ r = 5;
 pi = 3.14;
 area = pi * r * r;
 cir = pi * r + pi * r;
+tmp = t[3][4];
+tmp = t[2+3][13*4];
